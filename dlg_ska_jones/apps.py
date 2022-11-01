@@ -2,6 +2,13 @@ import logging
 import sys
 import time
 
+import astropy.constants as consts
+import astropy.units as u
+import matplotlib.pyplot as plt
+import numpy as np
+from astropy.coordinates import SkyCoord
+from astropy.time import Time
+from dlg.drop import BarrierAppDROP
 from dlg.meta import (
     dlg_component,
     dlg_batch_input,
@@ -11,35 +18,17 @@ from dlg.meta import (
     dlg_int_param,
     dlg_list_param,
 )
-
-t0 = time.time()
-
-import numpy as np
-
-from numpy import sin as sin
+from jones_solvers.processing_components import solve_jones
 from numpy import cos as cos
-
-from scipy.interpolate import interp1d
-
-import matplotlib.pyplot as plt
-
-from astropy.coordinates import SkyCoord
-from astropy.time import Time
-import astropy.units as u
-import astropy.constants as consts
-
+from numpy import sin as sin
 from rascil.data_models import PolarisationFrame
-from rascil.processing_components import create_named_configuration
 from rascil.processing_components import create_blockvisibility
-from rascil.processing_components.util.coordinate_support import lmn_to_skycoord
-
+from rascil.processing_components import create_named_configuration
 from rascil.processing_components.calibration.operations import (
     create_gaintable_from_blockvisibility,
 )
-
-from dlg.drop import BarrierAppDROP
-
-from jones_solvers.processing_components import solve_jones
+from rascil.processing_components.util.coordinate_support import lmn_to_skycoord
+from scipy.interpolate import interp1d
 
 log = logging.getLogger(__name__)
 # log.setLevel(logging.DEBUG)
@@ -50,8 +39,6 @@ mpl_logger = logging.getLogger("matplotlib")
 mpl_logger.setLevel(logging.WARNING)
 
 np.set_printoptions(linewidth=-1)
-
-t_import = time.time() - t0
 
 log.info("Init blockvisibility")
 
@@ -1889,7 +1876,6 @@ class AA05CaliTests(BarrierAppDROP):
         fstr = " - {:<35} {:6.1f} sec"
         log.info("")
         log.info("Timing:")
-        log.info(fstr.format("package imports", t_import))
         log.info(fstr.format("init blockvis", t_initvis))
         log.info(fstr.format("predict blockvis", t_fillvis))
         log.info(fstr.format("apply corruptions", t_updatevis))
