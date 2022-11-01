@@ -52,7 +52,7 @@ log.info("Init blockvisibility")
 # @param execution_time Execution Time/5/Float/ComponentParameter/readonly//False/False/Estimated execution time
 # @param num_cpus No. of CPUs/1/Integer/ComponentParameter/readonly//False/False/Number of cores used
 # @param group_start Group start/False/Boolean/ComponentParameter/readwrite//False/False/Is this node the start of a group?
-# @param appclass Application Class/jones_solvers.processing_components.daliuge.AA05_test_components.AA05CaliTests/String/ComponentParameter/readonly//False/False/Application class
+# @param appclass Application Class/dlg_ska_jones.apps.AA05CaliTests/String/ComponentParameter/readonly//False/False/Application class
 # @param latitude Latitude/-26.82472208/Float/ApplicationArgument/readwrite//False/False/description
 # @param longitude Longitude/116.76444824/Float/ApplicationArgument/readwrite//False/False/description
 # @param nsamples Num Samples/3/Integer/ApplicationArgument/readwrite//False/False/description
