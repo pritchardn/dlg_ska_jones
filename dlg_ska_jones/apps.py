@@ -84,7 +84,6 @@ class AA05CaliTests(BarrierAppDROP):
         [dlg_streaming_input("binary/*")],
     )
 
-    sleepTime = dlg_float_param("sleep time", 0)
     latitude = dlg_float_param("latitude", -26.82472208)
     longitude = dlg_float_param("longitude", 116.76444824)
     nsamples = dlg_int_param("nsamples", 3)
