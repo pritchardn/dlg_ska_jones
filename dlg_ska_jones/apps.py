@@ -97,6 +97,7 @@ class AA05CaliTests(BarrierAppDROP):
     nsrc = dlg_int_param("nsrc", 25)
 
     def initialize(self, **kwargs):
+        np.random.seed(42)
         super(AA05CaliTests, self).initialize(**kwargs)
 
     def run(self):
