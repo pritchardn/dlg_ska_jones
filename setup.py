@@ -1,6 +1,7 @@
 """Python setup.py for dlg_ska_jones package"""
 import io
 import os
+
 from setuptools import find_packages, setup
 
 
@@ -32,6 +33,7 @@ def read_requirements(path):
 setup(
     name="dlg_ska_jones",
     version=read("dlg_ska_jones", "VERSION"),
+    python_requires=">=3.0",
     description="Awesome dlg_ska_jones created by pritchardn",
     url="https://github.com/pritchardn/dlg_ska_jones/",
     long_description=read("README.md"),
