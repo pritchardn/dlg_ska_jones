@@ -1,4 +1,4 @@
-__package__ = "project_name"
+__package__ = "dlg_ska_jones"
 # The following imports are the binding to the DALiuGE system
 from dlg import droputils, utils
 

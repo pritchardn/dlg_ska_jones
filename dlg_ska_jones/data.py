@@ -1,7 +1,7 @@
 """
-project_name component module.
+dlg_ska_jones component module.
 
-This is the module of project_name containing DALiuGE data components.
+This is the module of dlg_ska_jones containing DALiuGE data components.
 Here you put your main data classes and objects.
 
 Typically a component project will contain multiple components and will
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 #
 # @par EAGLE_START
 # @param category DataDrop
-# @param[in] param/appclass Drop Class/project_name.MyData/String/readonly/
+# @param[in] param/appclass Drop Class/dlg_ska_jones.MyData/String/readonly/
 #     \~English Import direction for application class
 # @param[in] param/dummy Dummy parameter/ /String/readwrite/
 #     \~English Dummy modifyable parameter

@@ -16,10 +16,10 @@ echo "Description: $description";
 
 echo "Renaming project..."
 
-original_author="author_name"
-original_name="project_name"
-original_urlname="project_urlname"
-original_description="project_description"
+original_author="pritchardn"
+original_name="dlg_ska_jones"
+original_urlname="dlg_ska_jones"
+original_description="Awesome dlg_ska_jones created by pritchardn"
 # for filename in $(find . -name "*.*") 
 for filename in $(git ls-files) 
 do
@@ -30,7 +30,7 @@ do
     echo "Renamed $filename"
 done
 
-mv project_name $name
+mv dlg_ska_jones $name
 
 # remove the template related documents
 rm ABOUT_THIS_TEMPLATE.md
