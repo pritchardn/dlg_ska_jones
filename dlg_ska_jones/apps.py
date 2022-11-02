@@ -4,7 +4,10 @@ import time
 
 import astropy.constants as consts
 import astropy.units as u
+import matplotlib
 import matplotlib.pyplot as plt
+
+matplotlib.use("Agg")
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
@@ -1789,7 +1792,6 @@ def plot_performance(chisq1, chisq2, chisq2a, chisq2b, chisq2c, model_vis, show1
     ax2.set_ylim((ymin, ymax))
     ax3.set_ylim((ymin, ymax))
     plt.savefig("solver_performance.png")
-
 
 ##
 # @brief AA05CaliTests
