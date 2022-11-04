@@ -26,6 +26,8 @@ jobs:
 
       - name: Configure git
         run: |
+          git config --global user.name $GITHUB_USERNAME
+          git config --global user.email nicholas.pritchard@icrar.org
           OUTPUT_FILENAME=$PROJECT_NAME
           echo "OUTPUT_FILENAME=$OUTPUT_FILENAME" >> $GITHUB_ENV
 
