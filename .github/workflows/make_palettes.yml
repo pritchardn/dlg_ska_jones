@@ -1,0 +1,43 @@
+name: Generate component palettes
+
+on: [ push, pull_request ]
+
+jobs:
+
+  run_tests:
+    name: Generate component palettes
+    runs-on: ubuntu-20.04
+    env:
+      PROJECT_NAME: dlg_ska_jones
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        name: Install Python
+        with:
+          python-version: '3.9'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y doxygen xsltproc
+          pip install BlockDAG
+          git clone https://github.com/ICRAR/daliuge
+
+      - name: Configure git
+        run: |
+          OUTPUT_FILENAME=$PROJECT_NAME
+          echo "OUTPUT_FILENAME=$OUTPUT_FILENAME" >> $GITHUB_ENV
+
+      - name: Create palettes
+        run: |
+          python3 daliuge/tools/xml2palette/xml2palette.py -r ./$PROJECT_NAME $OUTPUT_FILENAME.palette
+
+      - name: Commit palettes to repository
+        run: |
+          mkdir -p palettes
+          mv $OUTPUT_FILENAME.palette palettes/
+          cd palettes
+          git add *
+          git diff-index --quiet HEAD || git commit -m "Automatically generated DALiuGE palette (branch $GITHUB_REF_NAME, commit $PROJECT_VERSION)"
+          git push
