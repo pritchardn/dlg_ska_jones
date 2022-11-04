@@ -2,6 +2,7 @@ import logging
 import pickle
 import sys
 import time
+from typing import NoReturn
 
 import astropy.constants as consts
 import astropy.units as u
@@ -11,6 +12,7 @@ from dlg import droputils
 
 matplotlib.use("Agg")
 import numpy as np
+import xarray
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 from dlg.drop import BarrierAppDROP
@@ -26,7 +28,12 @@ from dlg.meta import (
 from jones_solvers.processing_components import solve_jones
 from numpy import cos as cos
 from numpy import sin as sin
-from rascil.data_models import PolarisationFrame
+from rascil.data_models import (
+    PolarisationFrame,
+    BlockVisibility,
+    Configuration,
+    GainTable,
+)
 from rascil.processing_components import create_blockvisibility
 from rascil.processing_components import create_named_configuration
 from rascil.processing_components.calibration.operations import (
@@ -48,30 +55,39 @@ np.set_printoptions(linewidth=-1)
 log.info("Init blockvisibility")
 
 
-def create_phasecentre(ra, dec):
-    return SkyCoord(
-        ra=ra * u.deg, dec=dec * u.deg, frame="icrs", equinox="J2000"
+def create_phasecentre(ra: float, dec: float) -> SkyCoord:
+    return SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame="icrs", equinox="J2000")
+
+
+def generate_frequency_range(nchannels: int, channel_bandwidth: float) -> np.ndarray:
+    return np.arange(
+        100.0e6, 100.0e6 + nchannels * channel_bandwidth, channel_bandwidth
     )
 
 
-def generate_frequency_range(nchannels, channel_bandwidth):
-    return np.arange(100.0e6, 100.0e6 + nchannels * channel_bandwidth, channel_bandwidth)
-
-
-def filter_visibilities(blockvisibilities, subarray):
+def filter_visibilities(
+        blockvisibilities: BlockVisibility, subarray: list
+) -> (BlockVisibility, np.ndarray):
     subarray = (
             np.array(subarray) - 1
     )  # the two most longitudinally separated stations in each cluster
 
     model_vis = blockvisibilities.where(
-        blockvisibilities["antenna1"].isin(subarray) * blockvisibilities["antenna2"].isin(subarray),
+        blockvisibilities["antenna1"].isin(subarray)
+        * blockvisibilities["antenna2"].isin(subarray),
         drop=True,
     )
     return model_vis, subarray
 
 
-def setup_blockvisibility(lowconfig, times, frequency, channel_bandwidth, phasecentre,
-                          sample_time):
+def setup_blockvisibility(
+        lowconfig: Configuration,
+        times: np.ndarray,
+        frequency: np.ndarray,
+        channel_bandwidth: np.ndarray,
+        phasecentre: SkyCoord,
+        sample_time: float,
+) -> BlockVisibility:
     # create empty blockvis with intrumental polarisation (XX, XY, YX, YY)
     model_vis = create_blockvisibility(
         lowconfig,
@@ -87,7 +103,9 @@ def setup_blockvisibility(lowconfig, times, frequency, channel_bandwidth, phasec
     return model_vis
 
 
-def skymodel_single_source(nchannels):
+def skymodel_single_source(
+        nchannels: int,
+) -> (int, np.ndarray, np.ndarray, np.ndarray, np.ndarray):
     nsrc = 1
     jy = 50 * np.ones((nsrc, nchannels))
     l = np.zeros(nsrc)
@@ -96,7 +114,9 @@ def skymodel_single_source(nchannels):
     return nsrc, jy, l, m, n
 
 
-def skymodel_random_sources(dist_source_multiplier, frequency, nsrc):
+def skymodel_random_sources(
+        dist_source_multiplier: float, frequency: np.ndarray, nsrc: int
+) -> (int, np.ndarray, np.ndarray, np.ndarray, np.ndarray):
     dist_source_max = dist_source_multiplier * np.pi / 180.0
     # sky model: randomise sources across the field
     theta = 2.0 * np.pi * np.random.rand(nsrc)
@@ -110,7 +130,12 @@ def skymodel_random_sources(dist_source_multiplier, frequency, nsrc):
     return nsrc, jy, l, m, n
 
 
-def skymodel_real_sources(frequency, ra_hrs, dec_deg, jy_240MHz):
+def skymodel_real_sources(
+        frequency: np.ndarray,
+        ra_hrs: np.ndarray,
+        dec_deg: np.ndarray,
+        jy_240MHz: np.ndarray,
+) -> (int, np.ndarray, np.ndarray, np.ndarray, np.ndarray):
     ra0_hrs = 0.0
     dec0_deg = -27.0
     ra = ra_hrs * np.pi / 12.0
@@ -133,7 +158,15 @@ def skymodel_real_sources(frequency, ra_hrs, dec_deg, jy_240MHz):
     return nsrc, jy, l, m, n
 
 
-def setup_skymodel(sky_mode, nsrc, nchannels, frequency, ra_hrs=None, dec_deg=None, jy_240MHz=None):
+def setup_skymodel(
+        sky_mode: int,
+        nsrc: int,
+        nchannels: int,
+        frequency: np.ndarray,
+        ra_hrs: np.ndarray = None,
+        dec_deg: np.ndarray = None,
+        jy_240MHz: np.ndarray = None,
+) -> (int, np.ndarray, np.ndarray, np.ndarray, np.ndarray):
     if sky_mode == 0:
         return skymodel_single_source(nchannels)
     elif sky_mode == 1:
@@ -146,8 +179,19 @@ def setup_skymodel(sky_mode, nsrc, nchannels, frequency, ra_hrs=None, dec_deg=No
         raise ValueError("Unknown sky_mode index")
 
 
-def calculate_flux_densities(lon, lat, nchannels, nsrc, model_vis, phasecentre, frequency, jy, l, m,
-                             n):
+def calculate_flux_densities(
+        lon: float,
+        lat: float,
+        nchannels: int,
+        nsrc: int,
+        model_vis: xarray.Dataset,
+        phasecentre: SkyCoord,
+        frequency: np.ndarray,
+        jy: np.ndarray,
+        l: np.ndarray,
+        m: np.ndarray,
+        n: np.ndarray,
+) -> (xarray.Dataset, xarray.Dataset, np.ndarray):
     # make a full copy of the model for the actual visibilities.
     # The sky and cal models could be different...
     noiselessVis = model_vis.copy(deep=True)
@@ -210,11 +254,7 @@ def calculate_flux_densities(lon, lat, nchannels, nsrc, model_vis, phasecentre, 
                         * np.exp(
                     2j
                     * np.pi
-                    * (
-                            uvw[:, 0] * l[src]
-                            + uvw[:, 1] * m[src]
-                            + uvw[:, 2] * n[src]
-                    )
+                    * (uvw[:, 0] * l[src] + uvw[:, 1] * m[src] + uvw[:, 2] * n[src])
                 )
                 )
 
@@ -235,8 +275,17 @@ def calculate_flux_densities(lon, lat, nchannels, nsrc, model_vis, phasecentre, 
     return model_vis, noiselessVis, is_cal
 
 
-def solve_jones_trial(gt_fit, model_vis, noiseless_vis, algorithm, lin_solver="lsmr",
-                      lin_solve_normal=None, rcond=1e-6, tolerance=1e-6, niter=50):
+def solve_jones_trial(
+        gt_fit: GainTable,
+        model_vis: xarray.Dataset,
+        noiseless_vis: xarray.Dataset,
+        algorithm: int,
+        lin_solver: str = "lsmr",
+        lin_solve_normal: bool = None,
+        rcond: float = 1e-6,
+        tolerance: float = 1e-6,
+        niter: int = 50,
+) -> (np.ndarray, GainTable):
     gt_fit_copy = gt_fit.copy(deep=True)
     model_vis_copy = model_vis.copy(deep=True)
     observed_vis = noiseless_vis.copy(deep=True)
@@ -250,14 +299,23 @@ def solve_jones_trial(gt_fit, model_vis, noiseless_vis, algorithm, lin_solver="l
         algorithm=algorithm,
         lin_solver_normal=lin_solve_normal,
         lin_solver=lin_solver,
-        lin_solver_rcond=rcond
+        lin_solver_rcond=rcond,
     )
     return chi_sq, gt_fit_copy
 
 
-def update_visibilities(nchannels, sample_time, nsamples, channel_bandwidth, frequency, model_vis,
-                        noiselessVis, nsubarray,
-                        nvis, subarray):
+def update_visibilities(
+        nchannels: int,
+        sample_time: float,
+        nsamples: int,
+        channel_bandwidth: np.ndarray,
+        frequency: np.ndarray,
+        model_vis: xarray.Dataset,
+        noiselessVis: xarray.Dataset,
+        nsubarray: int,
+        nvis: int,
+        subarray: np.ndarray,
+) -> (GainTable, GainTable, np.ndarray):
     # Some RASCIL functions to look into using
     # gt_true = simulate_gaintable(modelVis, phase_error=1.0, amplitude_error=0.1, leakage=0.1)
     # gt_fit  = simulate_gaintable(modelVis, phase_error=0.0, amplitude_error=0.0, leakage=0.0)
@@ -407,7 +465,7 @@ def update_visibilities(nchannels, sample_time, nsamples, channel_bandwidth, fre
     return gt_fit, gt_true, sigma
 
 
-def plot_visibilities(is_cal, l, m):
+def plot_visibilities(is_cal: np.ndarray, l: np.ndarray, m: np.ndarray) -> NoReturn:
     plt.figure(num=0, figsize=(8, 8), facecolor="w", edgecolor="k")
     plt.subplot(111, aspect="equal")
     plt.plot(
@@ -431,9 +489,26 @@ def plot_visibilities(is_cal, l, m):
     plt.savefig("blockvisibilities.png")
 
 
-def log_timings(chisq1, chisq2, chisq2a, chisq2b, chisq2c, show1, show2, show2a, show2b,
-                show2c, t_fillvis, t_initvis, t_solving1, t_solving2, t_solving2a, t_solving2b,
-                t_solving2c, t_updatevis):
+def log_timings(
+        chisq1,
+        chisq2,
+        chisq2a,
+        chisq2b,
+        chisq2c,
+        show1,
+        show2,
+        show2a,
+        show2b,
+        show2c,
+        t_fillvis,
+        t_initvis,
+        t_solving1,
+        t_solving2,
+        t_solving2a,
+        t_solving2b,
+        t_solving2c,
+        t_updatevis,
+) -> NoReturn:
     fstr = " - {:<35} {:6.1f} sec"
     log.info("")
     log.info("Timing:")
@@ -468,8 +543,20 @@ def log_timings(chisq1, chisq2, chisq2a, chisq2b, chisq2c, show1, show2, show2a,
     log.info("")
 
 
-def plot_results(J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c,
-                 nsubarray):
+def plot_results(
+        J1: np.ndarray,
+        J2: np.ndarray,
+        J2a: np.ndarray,
+        J2b: np.ndarray,
+        J2c: np.ndarray,
+        Jt: np.ndarray,
+        show1: bool,
+        show2: bool,
+        show2a: bool,
+        show2b: bool,
+        show2c: bool,
+        nsubarray: int,
+) -> NoReturn:
     plt.figure(num=1, figsize=(20, 12), facecolor="w", edgecolor="k")
     ax241 = plt.subplot(241)
     ax241.set_title("real(J[0,0])", fontsize=16)
@@ -534,7 +621,20 @@ def plot_results(J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c
     plt.savefig("solver_results.png")
 
 
-def plot_solver_error(J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c, nsubarray):
+def plot_solver_error(
+        J1: np.ndarray,
+        J2: np.ndarray,
+        J2a: np.ndarray,
+        J2b: np.ndarray,
+        J2c: np.ndarray,
+        Jt: np.ndarray,
+        show1: bool,
+        show2: bool,
+        show2a: bool,
+        show2b: bool,
+        show2c: bool,
+        nsubarray: int,
+) -> NoReturn:
     plt.figure(num=2, figsize=(20, 12), facecolor="w", edgecolor="k")
     ax241 = plt.subplot(241)
     ax241.set_title("real(U[0,0])", fontsize=16)
@@ -620,7 +720,35 @@ def plot_solver_error(J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, s
     plt.savefig("solver_error.png")
 
 
-def run_trials(gt_fit, gt_true, model_vis, noiselessVis, subarray):
+def run_trials(
+        gt_fit: GainTable,
+        gt_true: GainTable,
+        model_vis: xarray.Dataset,
+        noiselessVis: xarray.Dataset,
+        subarray: np.ndarray,
+) -> (
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        float,
+        float,
+        float,
+        float,
+        float,
+):
     show1 = True
     show2 = False
     show2a = True
@@ -639,19 +767,12 @@ def run_trials(gt_fit, gt_true, model_vis, noiselessVis, subarray):
     if show1:
         log.info("Running algorithm 1 with defaults")
         t0 = time.time()
-        chisq1, gt1 = solve_jones_trial(
-            gt_fit,
-            model_vis,
-            noiselessVis,
-            1
-        )
+        chisq1, gt1 = solve_jones_trial(gt_fit, model_vis, noiselessVis, 1)
         t_solving1 = time.time() - t0
     if show2:
         log.info("Running algorithm 2 with defaults")
         t0 = time.time()
-        chisq2, gt2 = solve_jones_trial(
-            gt_fit, model_vis, noiselessVis, algorithm=2
-        )
+        chisq2, gt2 = solve_jones_trial(gt_fit, model_vis, noiselessVis, algorithm=2)
         t_solving2 = time.time() - t0
     if show2a:
         log.info("Running algorithm 2 with lin_solver_normal")
@@ -704,11 +825,44 @@ def run_trials(gt_fit, gt_true, model_vis, noiselessVis, subarray):
         J2b = gt2b["gain"].data[0, subarray, 0, :, :]
     if show2c:
         J2c = gt2c["gain"].data[0, subarray, 0, :, :]
-    return J1, J2, J2a, J2b, J2c, Jt, chisq1, chisq2, chisq2a, chisq2b, chisq2c, show1, show2, show2a, show2b, show2c, t_solving1, t_solving2, t_solving2a, t_solving2b, t_solving2c
+    return (
+        J1,
+        J2,
+        J2a,
+        J2b,
+        J2c,
+        Jt,
+        chisq1,
+        chisq2,
+        chisq2a,
+        chisq2b,
+        chisq2c,
+        show1,
+        show2,
+        show2a,
+        show2b,
+        show2c,
+        t_solving1,
+        t_solving2,
+        t_solving2a,
+        t_solving2b,
+        t_solving2c,
+    )
 
 
-def plot_error_compare(chisq1, chisq2, chisq2b, model_vis, show1, show2, show2b, sigma,
-                       subarray, nsamples, nchannels):
+def plot_error_compare(
+        chisq1: np.ndarray,
+        chisq2: np.ndarray,
+        chisq2b: np.ndarray,
+        model_vis: xarray.Dataset,
+        show1: bool,
+        show2: bool,
+        show2b: bool,
+        sigma: np.ndarray,
+        subarray: np.ndarray,
+        nsamples: int,
+        nchannels: int,
+) -> NoReturn:
     plt.figure(num=4, figsize=(14, 8), facecolor="w", edgecolor="k")
     # back of the envelope estimate of the error RMS level.
     # gi_est ~ sum_j((Vij+error)*Mij - Mij*Mij) / sum_j(Mij*Mij)
@@ -722,9 +876,7 @@ def plot_error_compare(chisq1, chisq2, chisq2b, model_vis, show1, show2, show2b,
     Mij = model_vis.sel({"antenna1": subarray[0]})["vis"].data[0, 1::, 0, 0]
     # could use the mean of all vis and multiply by nstn-1. Careful of autos though
     g_sigma = np.sqrt(
-        sigma ** 2
-        / np.sum(np.abs(Mij) ** 2)
-        / float(nsamples * nchannels)
+        sigma ** 2 / np.sum(np.abs(Mij) ** 2) / float(nsamples * nchannels)
     )
     v_sigma = 2 * np.sqrt(np.mean(np.abs(Mij) ** 2) * g_sigma ** 2)
     log.info("g_sigma = {}".format(g_sigma[0]))
@@ -750,8 +902,23 @@ def plot_error_compare(chisq1, chisq2, chisq2b, model_vis, show1, show2, show2b,
     plt.savefig("alg_error_comparison.png")
 
 
-def plot_performance(chisq1, chisq2, chisq2a, chisq2b, chisq2c, model_vis, show1, show2,
-                     show2a, show2b, show2c, sigma, subarray, nsamples, nchannels):
+def plot_performance(
+        chisq1: np.ndarray,
+        chisq2: np.ndarray,
+        chisq2a: np.ndarray,
+        chisq2b: np.ndarray,
+        chisq2c: np.ndarray,
+        model_vis: xarray.Dataset,
+        show1: bool,
+        show2: bool,
+        show2a: bool,
+        show2b: bool,
+        show2c: bool,
+        sigma: np.ndarray,
+        subarray: np.ndarray,
+        nsamples: int,
+        nchannels: int,
+) -> NoReturn:
     plt.figure(num=3, figsize=(20, 8), facecolor="w", edgecolor="k")
     # back of the envelope estimate of the error RMS level.
     # gi_est ~ sum_j((Vij+error)*Mij - Mij*Mij) / sum_j(Mij*Mij)
@@ -765,9 +932,7 @@ def plot_performance(chisq1, chisq2, chisq2a, chisq2b, chisq2c, model_vis, show1
     Mij = model_vis.sel({"antenna1": subarray[0]})["vis"].data[0, 1::, 0, 0]
     # could use the mean of all vis and multiply by nstn-1. Careful of autos though
     g_sigma = np.sqrt(
-        sigma ** 2
-        / np.sum(np.abs(Mij) ** 2)
-        / float(nsamples * nchannels)
+        sigma ** 2 / np.sum(np.abs(Mij) ** 2) / float(nsamples * nchannels)
     )
     v_sigma = 2 * np.sqrt(np.mean(np.abs(Mij) ** 2) * g_sigma ** 2)
     log.info("g_sigma = {}".format(g_sigma[0]))
@@ -905,8 +1070,14 @@ class AA05CaliTests(BarrierAppDROP):
 
         phasecentre = create_phasecentre(self.ra, self.dec)
 
-        model_vis = setup_blockvisibility(lowconfig, times, frequency, channel_bandwidth,
-                                          phasecentre, self.sample_time)
+        model_vis = setup_blockvisibility(
+            lowconfig,
+            times,
+            frequency,
+            channel_bandwidth,
+            phasecentre,
+            self.sample_time,
+        )
         nvis = model_vis["baselines"].shape[0]
 
         assert (
@@ -969,14 +1140,33 @@ class AA05CaliTests(BarrierAppDROP):
             ra_hrs = pickle.loads(droputils.allDropContents(self.inputs[0])).copy()
             dec_deg = pickle.loads(droputils.allDropContents(self.inputs[1]))
             jy_240MHz = pickle.loads(droputils.allDropContents(self.inputs[2]))
-            nsrc, jy, l, m, n = setup_skymodel(self.sky_model, self.nsrc, self.nchannels, frequency,
-                                               ra_hrs=ra_hrs, dec_deg=dec_deg, jy_240MHz=jy_240MHz)
+            nsrc, jy, l, m, n = setup_skymodel(
+                self.sky_model,
+                self.nsrc,
+                self.nchannels,
+                frequency,
+                ra_hrs=ra_hrs,
+                dec_deg=dec_deg,
+                jy_240MHz=jy_240MHz,
+            )
         else:
-            nsrc, jy, l, m, n = setup_skymodel(self.sky_model, self.nsrc, self.nchannels, frequency)
+            nsrc, jy, l, m, n = setup_skymodel(
+                self.sky_model, self.nsrc, self.nchannels, frequency
+            )
 
-        model_vis, noiseless_vis, is_cal = calculate_flux_densities(lon, lat, self.nchannels, nsrc,
-                                                                    model_vis, phasecentre,
-                                                                    frequency, jy, l, m, n)
+        model_vis, noiseless_vis, is_cal = calculate_flux_densities(
+            lon,
+            lat,
+            self.nchannels,
+            nsrc,
+            model_vis,
+            phasecentre,
+            frequency,
+            jy,
+            l,
+            m,
+            n,
+        )
 
         t_fillvis = time.time() - t0
 
@@ -986,10 +1176,18 @@ class AA05CaliTests(BarrierAppDROP):
 
         t0 = time.time()
 
-        gt_fit, gt_true, sigma = update_visibilities(self.nchannels, self.sample_time,
-                                                     self.nsamples, channel_bandwidth, frequency,
-                                                     model_vis, noiseless_vis, nsubarray, nvis,
-                                                     subarray)
+        gt_fit, gt_true, sigma = update_visibilities(
+            self.nchannels,
+            self.sample_time,
+            self.nsamples,
+            channel_bandwidth,
+            frequency,
+            model_vis,
+            noiseless_vis,
+            nsubarray,
+            nvis,
+            subarray,
+        )
 
         t_updatevis = time.time() - t0
 
@@ -998,26 +1196,90 @@ class AA05CaliTests(BarrierAppDROP):
         # Some RASCIL functions to look into using
         # gtsol=solve_gaintable(cIVis, IVis, phase_only=False, jones_type="B")
 
-        J1, J2, J2a, J2b, J2c, Jt, chisq1, chisq2, chisq2a, chisq2b, chisq2c, show1, show2, show2a, show2b, show2c, t_solving1, t_solving2, t_solving2a, t_solving2b, t_solving2c = run_trials(
-            gt_fit, gt_true, model_vis, noiseless_vis, subarray)
+        (
+            J1,
+            J2,
+            J2a,
+            J2b,
+            J2c,
+            Jt,
+            chisq1,
+            chisq2,
+            chisq2a,
+            chisq2b,
+            chisq2c,
+            show1,
+            show2,
+            show2a,
+            show2b,
+            show2c,
+            t_solving1,
+            t_solving2,
+            t_solving2a,
+            t_solving2b,
+            t_solving2c,
+        ) = run_trials(gt_fit, gt_true, model_vis, noiseless_vis, subarray)
 
         # --- #
-        """
-        plot_results(J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c,
-                     nsubarray)
+        plot_results(
+            J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c, nsubarray
+        )
         # --- #
 
-        plot_solver_error(J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c,
-                          nsubarray)
+        plot_solver_error(
+            J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c, nsubarray
+        )
 
-        plot_performance(chisq1, chisq2, chisq2a, chisq2b, chisq2c, model_vis, show1, show2,
-                         show2a, show2b, show2c, sigma, subarray, self.nsamples, self.nchannels)
+        plot_performance(
+            chisq1,
+            chisq2,
+            chisq2a,
+            chisq2b,
+            chisq2c,
+            model_vis,
+            show1,
+            show2,
+            show2a,
+            show2b,
+            show2c,
+            sigma,
+            subarray,
+            self.nsamples,
+            self.nchannels,
+        )
 
-        plot_error_compare(chisq1, chisq2, chisq2b, model_vis, show1, show2, show2b, sigma,
-                           subarray, self.nsamples, self.nchannels)
+        plot_error_compare(
+            chisq1,
+            chisq2,
+            chisq2b,
+            model_vis,
+            show1,
+            show2,
+            show2b,
+            sigma,
+            subarray,
+            self.nsamples,
+            self.nchannels,
+        )
 
-        log_timings(chisq1, chisq2, chisq2a, chisq2b, chisq2c, show1, show2, show2a, show2b,
-                    show2c, t_fillvis, t_initvis, t_solving1, t_solving2, t_solving2a,
-                    t_solving2b, t_solving2c, t_updatevis)
-        """
+        log_timings(
+            chisq1,
+            chisq2,
+            chisq2a,
+            chisq2b,
+            chisq2c,
+            show1,
+            show2,
+            show2a,
+            show2b,
+            show2c,
+            t_fillvis,
+            t_initvis,
+            t_solving1,
+            t_solving2,
+            t_solving2a,
+            t_solving2b,
+            t_solving2c,
+            t_updatevis,
+        )
         return 0
