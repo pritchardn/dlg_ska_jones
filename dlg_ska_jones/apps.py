@@ -312,8 +312,6 @@ def update_visibilities(
         frequency: np.ndarray,
         model_vis: xarray.Dataset,
         noiselessVis: xarray.Dataset,
-        nsubarray: int,
-        nvis: int,
         subarray: np.ndarray,
 ) -> (GainTable, GainTable, np.ndarray):
     # Some RASCIL functions to look into using
@@ -323,6 +321,8 @@ def update_visibilities(
     # (is in sec, so should be > 43200 for a 12 hr observation)
     # could alternatively just use the first time step in the call
     # "ValueError: Unknown Jones type P"
+    nsubarray = len(subarray)
+    nvis = model_vis["baselines"].shape[0]
     gt_true = create_gaintable_from_blockvisibility(
         model_vis, timeslice=1e6, jones_type="G"
     )
@@ -555,8 +555,9 @@ def plot_results(
         show2a: bool,
         show2b: bool,
         show2c: bool,
-        nsubarray: int,
+        subarray: np.ndarray,
 ) -> NoReturn:
+    nsubarray = len(subarray)
     plt.figure(num=1, figsize=(20, 12), facecolor="w", edgecolor="k")
     ax241 = plt.subplot(241)
     ax241.set_title("real(J[0,0])", fontsize=16)
@@ -633,8 +634,9 @@ def plot_solver_error(
         show2a: bool,
         show2b: bool,
         show2c: bool,
-        nsubarray: int,
+        subarray: np.ndarray,
 ) -> NoReturn:
+    nsubarray = len(subarray)
     plt.figure(num=2, figsize=(20, 12), facecolor="w", edgecolor="k")
     ax241 = plt.subplot(241)
     ax241.set_title("real(U[0,0])", fontsize=16)
@@ -898,7 +900,7 @@ def plot_error_compare(
     plt.xlabel("iteration", fontsize=14)
     plt.ylabel(r"unnormalised $\chi^2$ error", fontsize=14)
     plt.legend(loc=1, fontsize=14)
-    plt.grid()
+    plt.grid(True)
     plt.savefig("alg_error_comparison.png")
 
 
@@ -950,7 +952,7 @@ def plot_performance(
     plt.xlabel("iteration", fontsize=14)
     plt.ylabel(r"unnormalised $\chi^2$ error", fontsize=14)
     plt.legend(loc=1, fontsize=12)
-    plt.grid()
+    plt.grid(True)
     ax2 = plt.subplot(132)
     ax2.set_yscale("log")
     if show2:
@@ -968,7 +970,7 @@ def plot_performance(
     plt.xlabel("iteration", fontsize=14)
     plt.ylabel(r"unnormalised $\chi^2$ error", fontsize=14)
     plt.legend(loc=1, fontsize=12)
-    plt.grid()
+    plt.grid(True)
     ax3 = plt.subplot(133)
     ax3.set_yscale("log")
     if show2b:
@@ -986,7 +988,7 @@ def plot_performance(
     plt.xlabel("iteration", fontsize=14)
     plt.ylabel(r"unnormalised $\chi^2$ error", fontsize=14)
     plt.legend(loc=1, fontsize=12)
-    plt.grid()
+    plt.grid(True)
     ymin = min([ax1.get_ylim()[0], ax2.get_ylim()[0], ax3.get_ylim()[0]])
     ymax = max([ax1.get_ylim()[1], ax2.get_ylim()[1], ax3.get_ylim()[1]])
     ax1.set_ylim((ymin, ymax))
@@ -1184,8 +1186,6 @@ class AA05CaliTests(BarrierAppDROP):
             frequency,
             model_vis,
             noiseless_vis,
-            nsubarray,
-            nvis,
             subarray,
         )
 
@@ -1222,12 +1222,12 @@ class AA05CaliTests(BarrierAppDROP):
 
         # --- #
         plot_results(
-            J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c, nsubarray
+            J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c, subarray
         )
         # --- #
 
         plot_solver_error(
-            J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c, nsubarray
+            J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c, subarray
         )
 
         plot_performance(
