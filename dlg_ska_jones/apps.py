@@ -1139,7 +1139,7 @@ class AA05CaliTests(BarrierAppDROP):
 
         t0 = time.time()
         if self.sky_model == 3:
-            ra_hrs = pickle.loads(droputils.allDropContents(self.inputs[0])).copy()
+            ra_hrs = pickle.loads(droputils.allDropContents(self.inputs[0]))
             dec_deg = pickle.loads(droputils.allDropContents(self.inputs[1]))
             jy_240MHz = pickle.loads(droputils.allDropContents(self.inputs[2]))
             nsrc, jy, l, m, n = setup_skymodel(
