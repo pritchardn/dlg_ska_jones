@@ -1,11 +1,12 @@
-daliuge-engine>=2.0
-daliuge-translator>=2.0
+daliuge-common
+daliuge-engine
+daliuge-translator
 ska-sdp-jones-solvers
 argparse~=1.4.0
 pytest~=7.2.0
 setuptools~=60.2.0
 astropy~=5.0.1
 rascil~=0.6.0
-numpy~=1.22.2
+numpy
 matplotlib~=3.5.1
 scipy~=1.8.0
