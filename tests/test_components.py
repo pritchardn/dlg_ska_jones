@@ -6,4 +6,6 @@ given = pytest.mark.parametrize
 
 
 def test_AA05CaliTests():
-    assert AA05CaliTests("a", "a").run() == 0
+    drop = AA05CaliTests("a", "a")
+    drop.sky_model = 1
+    assert drop.run() == 0
