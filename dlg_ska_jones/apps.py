@@ -465,7 +465,8 @@ def update_visibilities(
     return gt_fit, gt_true, sigma
 
 
-def plot_visibilities(is_cal: np.ndarray, l: np.ndarray, m: np.ndarray) -> NoReturn:
+def plot_visibilities(is_cal: np.ndarray, l: np.ndarray, m: np.ndarray,
+                      fileprefix: str) -> NoReturn:
     plt.figure(num=0, figsize=(8, 8), facecolor="w", edgecolor="k")
     plt.subplot(111, aspect="equal")
     plt.plot(
@@ -486,7 +487,7 @@ def plot_visibilities(is_cal: np.ndarray, l: np.ndarray, m: np.ndarray) -> NoRet
     plt.xlabel("sin$^{-1}(l)$ deg", fontsize=14)
     plt.ylabel("sin$^{-1}(m)$ deg", fontsize=14)
     plt.legend(fontsize=12, frameon=False)
-    plt.savefig("blockvisibilities.png")
+    plt.savefig(f"{fileprefix}-blockvisibilities.png")
 
 
 def log_timings(
@@ -556,6 +557,7 @@ def plot_results(
         show2b: bool,
         show2c: bool,
         subarray: np.ndarray,
+        fileprefix: str,
 ) -> NoReturn:
     nsubarray = len(subarray)
     plt.figure(num=1, figsize=(20, 12), facecolor="w", edgecolor="k")
@@ -619,7 +621,7 @@ def plot_results(
     if show2c:
         plot_gain(J2c, "c-", "Alg 2 with lstsq, rcond = 1e-4")
     ax241.legend(fontsize=10)
-    plt.savefig("solver_results.png")
+    plt.savefig(f"{fileprefix}-solver_results.png")
 
 
 def plot_solver_error(
@@ -635,6 +637,7 @@ def plot_solver_error(
         show2b: bool,
         show2c: bool,
         subarray: np.ndarray,
+        fileprefix: str,
 ) -> NoReturn:
     nsubarray = len(subarray)
     plt.figure(num=2, figsize=(20, 12), facecolor="w", edgecolor="k")
@@ -719,7 +722,7 @@ def plot_solver_error(
     if show2c:
         plot_ambiguity(J2c, Jt, nsubarray, "c-", "Alg 2 with lstsq, rcond = 1e-4")
     ax241.legend(fontsize=10)
-    plt.savefig("solver_error.png")
+    plt.savefig(f"{fileprefix}-solver_error.png")
 
 
 def run_trials(
@@ -728,6 +731,7 @@ def run_trials(
         model_vis: xarray.Dataset,
         noiselessVis: xarray.Dataset,
         subarray: np.ndarray,
+        fileprefix: str,
 ) -> (
         np.ndarray,
         np.ndarray,
@@ -864,6 +868,7 @@ def plot_error_compare(
         subarray: np.ndarray,
         nsamples: int,
         nchannels: int,
+        fileprefix: str,
 ) -> NoReturn:
     plt.figure(num=4, figsize=(14, 8), facecolor="w", edgecolor="k")
     # back of the envelope estimate of the error RMS level.
@@ -901,7 +906,7 @@ def plot_error_compare(
     plt.ylabel(r"unnormalised $\chi^2$ error", fontsize=14)
     plt.legend(loc=1, fontsize=14)
     plt.grid(True)
-    plt.savefig("alg_error_comparison.png")
+    plt.savefig(f"{fileprefix}-alg_error_comparison.png")
 
 
 def plot_performance(
@@ -920,6 +925,7 @@ def plot_performance(
         subarray: np.ndarray,
         nsamples: int,
         nchannels: int,
+        fileprefix: str,
 ) -> NoReturn:
     plt.figure(num=3, figsize=(20, 8), facecolor="w", edgecolor="k")
     # back of the envelope estimate of the error RMS level.
@@ -994,7 +1000,7 @@ def plot_performance(
     ax1.set_ylim((ymin, ymax))
     ax2.set_ylim((ymin, ymax))
     ax3.set_ylim((ymin, ymax))
-    plt.savefig("solver_performance.png")
+    plt.savefig(f"{fileprefix}-solver_performance.png")
 
 
 ##
@@ -1056,7 +1062,7 @@ class AA05CaliTests(BarrierAppDROP):
         The run method is mandatory for DALiuGE application components.
         """
         t0 = time.time()
-
+        file_prefix = f"{self.nsamples}-{self.sample_time}-{self.nchannels}-{self.channel_bandwidth}-{self.sky_model}"
         lowconfig = create_named_configuration("LOWBD2")
         stations = lowconfig["stations"]
         nstations = stations.shape[0]
@@ -1172,7 +1178,7 @@ class AA05CaliTests(BarrierAppDROP):
 
         t_fillvis = time.time() - t0
 
-        plot_visibilities(is_cal, l, m)
+        plot_visibilities(is_cal, l, m, file_prefix)
 
         log.info("Applying calibration factors and noise")
 
@@ -1218,16 +1224,16 @@ class AA05CaliTests(BarrierAppDROP):
             t_solving2a,
             t_solving2b,
             t_solving2c,
-        ) = run_trials(gt_fit, gt_true, model_vis, noiseless_vis, subarray)
+        ) = run_trials(gt_fit, gt_true, model_vis, noiseless_vis, subarray, file_prefix)
 
         # --- #
         plot_results(
-            J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c, subarray
+            J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c, subarray, file_prefix
         )
         # --- #
 
         plot_solver_error(
-            J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c, subarray
+            J1, J2, J2a, J2b, J2c, Jt, show1, show2, show2a, show2b, show2c, subarray, file_prefix
         )
 
         plot_performance(
@@ -1246,6 +1252,7 @@ class AA05CaliTests(BarrierAppDROP):
             subarray,
             self.nsamples,
             self.nchannels,
+            file_prefix,
         )
 
         plot_error_compare(
@@ -1260,6 +1267,7 @@ class AA05CaliTests(BarrierAppDROP):
             subarray,
             self.nsamples,
             self.nchannels,
+            file_prefix,
         )
 
         log_timings(
