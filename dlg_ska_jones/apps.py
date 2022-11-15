@@ -488,6 +488,7 @@ def plot_visibilities(is_cal: np.ndarray, l: np.ndarray, m: np.ndarray,
     plt.ylabel("sin$^{-1}(m)$ deg", fontsize=14)
     plt.legend(fontsize=12, frameon=False)
     plt.savefig(f"{fileprefix}-blockvisibilities.png")
+    plt.clf()
 
 
 def log_timings(
@@ -622,6 +623,7 @@ def plot_results(
         plot_gain(J2c, "c-", "Alg 2 with lstsq, rcond = 1e-4")
     ax241.legend(fontsize=10)
     plt.savefig(f"{fileprefix}-solver_results.png")
+    plt.clf()
 
 
 def plot_solver_error(
@@ -723,6 +725,7 @@ def plot_solver_error(
         plot_ambiguity(J2c, Jt, nsubarray, "c-", "Alg 2 with lstsq, rcond = 1e-4")
     ax241.legend(fontsize=10)
     plt.savefig(f"{fileprefix}-solver_error.png")
+    plt.clf()
 
 
 def run_trials(
@@ -907,6 +910,7 @@ def plot_error_compare(
     plt.legend(loc=1, fontsize=14)
     plt.grid(True)
     plt.savefig(f"{fileprefix}-alg_error_comparison.png")
+    plt.clf()
 
 
 def plot_performance(
@@ -1001,6 +1005,7 @@ def plot_performance(
     ax2.set_ylim((ymin, ymax))
     ax3.set_ylim((ymin, ymax))
     plt.savefig(f"{fileprefix}-solver_performance.png")
+    plt.clf()
 
 
 ##
